@@ -1,0 +1,81 @@
+---
+title: "Practice animating graphs"
+output: html_document
+---
+
+```{r packages}
+library(tidyverse)
+library(gganimate)
+library(here) # for specifying directory location
+
+theme_set(theme_minimal())
+```
+
+## Import data
+
+```{r}
+freedom <- read_csv(
+  file = here("data", "freedom.csv"),
+  # NA values are recorded as '-'
+  na = "-"
+  )
+freedom
+```
+
+- Data is in a wide format
+    - `pr_*` - political rights, scores 1-7 (1 highest degree of freedom, 7 the lowest)
+    - `cl_*` - civil liberties, scores 1-7 (1 highest degree of freedom, 7 the lowest)
+    - `status_*` - freedom status (Free, Partly Free, and Not Free)
+
+## Calculate the top fifteen countries whose civil liberties scores have varied the most
+
+```{r}
+freedom_to_plot <- freedom %>%
+  # calculate rowwise standard deviations (one row per country)
+  rowwise() %>%
+  mutate(sd = sd(c_across(contains("cl_")), na.rm = TRUE)) %>%
+  ungroup() %>%
+  # find the 15 countries with the highest standard deviations
+  relocate(country, sd) %>%
+  slice_max(order_by = sd, n = 15) %>%
+  # only keep countries with complete observations - necessary for future plotting
+  drop_na()
+freedom_to_plot
+
+# calculate position rankings rather than raw scores
+freedom_ranked <- freedom_to_plot %>%
+  # only keep columns with civil liberties scores
+  select(country, contains("cl_")) %>%
+  # wrangle the data to a long format
+  pivot_longer(
+    cols = -country,
+    names_to = "year",
+    values_to = "civil_liberty",
+    names_prefix = "cl_",
+    names_transform = list(year = as.numeric)
+  ) %>%
+  # calculate rank within year - larger is worse, so reverse in the ranking
+  group_by(year) %>%
+  mutate(rank_in_year = rank(-civil_liberty, ties.method = "first")) %>%
+  ungroup() %>%
+  # highlight Turkey
+  mutate(is_turkey = if_else(country == "Turkey", TRUE, FALSE))
+```
+
+## Faceted plot
+
+```{r}
+
+```
+
+## Animated plot
+
+```{r}
+
+```
+
+## Session information
+
+```{r}
+sessioninfo::session_info()
+```

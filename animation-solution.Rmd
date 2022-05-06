@@ -1,0 +1,133 @@
+---
+title: "Practice animating graphs"
+output: html_document
+---
+
+```{r packages}
+library(tidyverse)
+library(gganimate)
+library(here) # for specifying directory location
+
+theme_set(theme_minimal())
+```
+
+## Import data
+
+```{r}
+freedom <- read_csv(
+  file = here("data", "freedom.csv"),
+  # NA values are recorded as '-'
+  na = "-"
+  )
+freedom
+```
+
+- Data is in a wide format
+    - `pr_*` - political rights, scores 1-7 (1 highest degree of freedom, 7 the lowest)
+    - `cl_*` - civil liberties, scores 1-7 (1 highest degree of freedom, 7 the lowest)
+    - `status_*` - freedom status (Free, Partly Free, and Not Free)
+
+## Calculate the top fifteen countries whose civil liberties scores have varied the most
+
+```{r}
+freedom_to_plot <- freedom %>%
+  # calculate rowwise standard deviations (one row per country)
+  rowwise() %>%
+  mutate(sd = sd(c_across(contains("cl_")), na.rm = TRUE)) %>%
+  ungroup() %>%
+  # find the 15 countries with the highest standard deviations
+  relocate(country, sd) %>%
+  slice_max(order_by = sd, n = 15) %>%
+  # only keep countries with complete observations - necessary for future plotting
+  drop_na()
+freedom_to_plot
+
+# calculate position rankings rather than raw scores
+freedom_ranked <- freedom_to_plot %>%
+  # only keep columns with civil liberties scores
+  select(country, contains("cl_")) %>%
+  # wrangle the data to a long format
+  pivot_longer(
+    cols = -country,
+    names_to = "year",
+    values_to = "civil_liberty",
+    names_prefix = "cl_",
+    names_transform = list(year = as.numeric)
+  ) %>%
+  # calculate rank within year - larger is worse, so reverse in the ranking
+  group_by(year) %>%
+  mutate(rank_in_year = rank(-civil_liberty, ties.method = "first")) %>%
+  ungroup() %>%
+  # highlight Turkey
+  mutate(is_turkey = if_else(country == "Turkey", TRUE, FALSE))
+```
+
+## Faceted plot
+
+```{r}
+freedom_faceted_plot <- freedom_ranked %>%
+  # civil liberty vs freedom rank
+  ggplot(aes(x = civil_liberty, y = factor(rank_in_year), fill = is_turkey)) +
+  geom_col(show.legend = FALSE) +
+  # change the color palette for emphasis of Turkey
+  scale_fill_manual(values = c("gray", "red")) +
+  # facet by year
+  facet_wrap(vars(year)) +
+  # create explicit labels for civil liberties score,
+  # leaving room for country text labels
+  scale_x_continuous(
+    limits = c(-5, 7),
+    breaks = 1:7
+  ) +
+  geom_text(
+    hjust = "right",
+    aes(label = country),
+    x = -1
+  ) +
+  # remove extraneous theme/label components
+  theme(
+    panel.grid.major.y = element_blank(),
+    panel.grid.minor.y = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    axis.text.y = element_blank()
+  ) +
+  labs(x = NULL, y = NULL)
+freedom_faceted_plot
+```
+
+## Animated plot
+
+```{r}
+freedom_bar_race <- freedom_faceted_plot +
+  # remove faceting
+  facet_null() +
+  # label the current year in the top corner of the plot
+  geom_text(
+    x = 5, y = 11,
+    hjust = "left",
+    aes(label = as.character(year)),
+    size = 10
+  ) +
+  # define group structure for transitions
+  aes(group = country) +
+  # temporal transition - ensure integer value for labeling
+  transition_time(as.integer(year)) +
+  labs(
+    title = "Civil liberties rating, {frame_time}",
+    subtitle = "1: Highest degree of freedom - 7: Lowest degree of freedom"
+  )
+
+# basic transition
+animate(freedom_bar_race, nframes = 30, fps = 2)
+```
+
+```{r}
+# smoother transition
+animate(freedom_bar_race, nframes = 300, fps = 15, start_pause = 10, end_pause = 10)
+```
+
+## Session information
+
+```{r}
+sessioninfo::session_info()
+```
