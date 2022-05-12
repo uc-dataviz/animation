@@ -87,8 +87,7 @@ freedom_faceted_plot <- freedom_ranked %>%
   # remove extraneous theme/label components
   theme(
     panel.grid.major.y = element_blank(),
-    panel.grid.minor.y = element_blank(),
-    panel.grid.minor.x = element_blank(),
+    panel.grid.minor = element_blank(),
     axis.text.y = element_blank()
   ) +
   labs(x = NULL, y = NULL)
